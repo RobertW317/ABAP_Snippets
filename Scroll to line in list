@@ -1,0 +1,80 @@
+
+
+SPAN {
+font-family: "Courier New";
+font-size: 10pt;
+color: #000000;
+background: #FFFFFF;
+}
+.L0S31 {
+font-style: italic;
+color: #808080;
+}
+.L0S32 {
+color: #3399FF;
+}
+.L0S33 {
+color: #4DA619;
+}
+.L0S52 {
+color: #0000FF;
+}
+.L0S55 {
+color: #800080;
+}
+.L0S70 {
+color: #808080;
+}
+
+DATA: BEGIN OF PAGE,
+        SCRLLINE LIKE SYST-LILLI,      "scroll line to top of screen
+        CURSLINE LIKE SYST-LILLI,      "line to put cursor on
+        HDRLINES TYPE I,               "lines in header + 1
+        TWOHDRS TYPE I,                "two headers on screen
+        CPOSTOP TYPE I,                "position of cursor from top
+        CPOSBOT TYPE I,                "position of cursor from bottom
+        CPOSIT TYPE I,                 "position on the screen
+        PAGNO TYPE I,                  "pageno of line
+        PGELINES TYPE I,               "lines used so far
+      END OF PAGE.
+
+
+
+* Call after user click
+*---------------------------------------------------------------------*
+*       FORM SET_SCROLL_LINE                                          *
+* determine the correct line to scroll the re-written report to, so   *
+* that the user is returned to the same spot on the screen            *
+* if user is mid way between pages, ie two headers are visable on the *
+* screen, check if they are on the secondary page and adjust the      *
+* scroll variable accordingly so as not to jump up lines because the  *
+* scroll variable will be out by the number of lines in the extra hdr *
+*---------------------------------------------------------------------*
+FORM SET_SCROLL_LINE.
+  PAGE-CURSLINE = SYST-LILLI.
+  PAGE-SCRLLINE = SYST-LILLI - ( SYST-CUROW - PAGE-HDRLINES ).
+  PAGE-PGELINES = ( PAGE-PAGNO - 1 ) * SYST-LINCT.
+  PAGE-CPOSTOP = ( PAGE-SCRLLINE + SYST-CUROW ) - PAGE-PGELINES.
+  PAGE-CPOSBOT = ( PAGE-SCRLLINE - SYST-CUROW ) - PAGE-PGELINES.
+  PAGE-CPOSIT = PAGE-CPOSTOP + PAGE-CPOSBOT.
+  PAGE-TWOHDRS = PAGE-HDRLINES * 2.
+  IF PAGE-CPOSIT LT PAGE-TWOHDRS.
+    PAGE-SCRLLINE = PAGE-SCRLLINE + 1.
+  ENDIF.
+ENDFORM.
+
+
+
+* Call after new list written
+*---------------------------------------------------------------------*
+*       FORM POSITION_LIST                                            *
+*---------------------------------------------------------------------*
+FORM POSITION_LIST.
+  CALL FUNCTION 'LIST_SCROLL_LINE_TOPMOST'
+       EXPORTING
+            LIST_INDEX = 1
+            LIST_LINE  = PAGE-SCRLLINE
+       EXCEPTIONS
+            OTHERS     = 1.
+  CHECK SYST-SUBRC = 0.
+ENDFORM.
