@@ -1,0 +1,1189 @@
+
+
+
+* ar aging nOTES REPORT
+
+report  z_Araging_Notes line-size 170.
+
+TABLES: zagingt,
+        ZAGINGT_NOTES,
+        sscrfields.
+
+data: begin of it_aging occurs 100,
+           kunnr    like zagingt-kunnr,     "PartnerNo
+           name1    like zagingt-name1,     "Name
+           belnr    like zagingt-belnr,     "Doc No
+           sgtxt    like zagingt-sgtxt,     "Text
+           doc2     like zagingt-doc2,      "Doc2 - assignment
+           duedate  like zagingt-duedate,   "Due date
+           dmbtr    like zagingt-dmbtr,     "amount  - local Cur
+           twaers   like zagingt-twaers,    "local cur
+           wrbtr    like zagingt-wrbtr,     "amount - Doc cur
+           waers    like zagingt-twaers,    "local cur
+           days_past type i,                "days past due
+           dayscur   like zagingt-dmbtr,    "1-30 days past
+           days30    like zagingt-dmbtr,    "1-30 days past
+           days60    like zagingt-dmbtr,    "31-60 days past
+           days90    like zagingt-dmbtr,    "61-90 days past
+           days120   like zagingt-dmbtr,    "91-120 days past
+           daysov120 like zagingt-dmbtr,    "121+ days past
+           totalline(1) type c,
+       end of it_aging.
+
+  data: begin of it_aging_tot occurs 100,
+           exp(1)   type c,                 "expand/contract
+           kunnr    like zagingt-kunnr,     "PartnerNo
+           name1    like zagingt-name1,     "Name
+           dmbtr    like zagingt-dmbtr,     "amount  - local Cur
+           wrbtr    like zagingt-wrbtr,     "amount - Doc cur
+           dayscur   like zagingt-dmbtr,    "1-30 days past
+           days30    like zagingt-dmbtr,    "1-30 days past
+           days60    like zagingt-dmbtr,    "31-60 days past
+           days90    like zagingt-dmbtr,    "61-90 days past
+           days120   like zagingt-dmbtr,    "91-120 days past
+           daysov120 like zagingt-dmbtr,    "121+ days past
+       end of it_aging_tot.
+
+  data: begin of it_aging_grand_tot occurs 100,
+           exp(1)   type c,                 "expand/contract
+           dmbtr    like zagingt-dmbtr,     "amount  - local Cur
+           wrbtr    like zagingt-wrbtr,     "amount - Doc cur
+           dayscur   like zagingt-dmbtr,    "1-30 days past
+           days30    like zagingt-dmbtr,    "1-30 days past
+           days60    like zagingt-dmbtr,    "31-60 days past
+           days90    like zagingt-dmbtr,    "61-90 days past
+           days120   like zagingt-dmbtr,    "91-120 days past
+           daysov120 like zagingt-dmbtr,    "121+ days past
+       end of it_aging_grand_tot.
+
+DATA: BEGIN OF it_dl OCCURS 100,
+        str(1024),
+      END OF it_dl,
+      xstr(128) TYPE c,
+      out_file TYPE string,
+      macro_d type string.     "LIKE rlgrap-filename      .
+
+DATA: BEGIN OF page,
+        scrlline LIKE syst-lilli,      "scroll line to top of screen
+        cursline LIKE syst-lilli,      "line to put cursor on
+        hdrlines TYPE i,               "lines in header + 1
+        twohdrs TYPE i,                "two headers on screen
+        cpostop TYPE i,                "position of cursor from top
+        cposbot TYPE i,                "position of cursor from bottom
+        cposit TYPE i,                 "position on the screen
+        pagno TYPE i,                  "pageno of line
+        pgelines TYPE i,               "lines used so far
+      END OF page.
+
+DATA: g_field(40) TYPE c,
+      line_1(115) type c,
+      line_2(168) type c,
+      ADD(3) type c,
+      VIEW(4) type c.
+
+DATA: it_zagingt LIKE zagingt OCCURS 0 WITH HEADER LINE,
+      it_zagingt_notes LIKE ZAGINGT_NOTES OCCURS 0 WITH HEADER LINE.
+
+DATA: buttonNo type i.
+
+SELECTION-SCREEN BEGIN OF BLOCK 1 WITH FRAME TITLE xxx1.
+selection-screen skip.
+select-options:
+       sbukrs for zagingt-bukrs no INTERVALS no-extension,
+       sbudat for zagingt-docdate no INTERVALS no-extension,
+       sbusab for zagingt-busab no INTERVALS.
+selection-screen skip 2.
+selection-screen pushbutton 1(25) pb1 user-command 0001.
+SELECTION-SCREEN SKIP 2.
+selection-screen pushbutton 1(25) pb2 user-command 0002.
+SELECTION-SCREEN SKIP 1.
+SELECTION-SCREEN END OF BLOCK 1.
+
+* SELECTION SCREEN FOR USER TO ENTER NEW NOTES
+SELECTION-SCREEN BEGIN OF SCREEN 123 AS WINDOW.
+SELECTION-SCREEN BEGIN OF BLOCK bl1 NO INTERVALS.
+SELECTION-SCREEN SKIP 1.
+SELECT-OPTIONS:
+  x_belnr FOR zagingt_notes-belnr NO INTERVALS NO-EXTENSION.
+*  x_note  FOR zagingt_notes-note  NO INTERVALS NO-EXTENSION.
+SELECTION-SCREEN SKIP 1.
+parameter x_note(117) type c.
+parameter y_note(117) type c.
+SELECTION-SCREEN SKIP 1.
+SELECTION-SCREEN COMMENT /5(79) comm004.
+SELECTION-SCREEN END OF BLOCK bl1.
+SELECTION-SCREEN END OF SCREEN 123.
+
+
+INITIALIZATION.
+  IF  sy-sysid = 'DV2'.
+    MOVE: 'I'      TO sbukrs-sign,
+          'EQ'     TO sbukrs-option,
+          '0030' TO sbukrs-low.
+    APPEND sbukrs.
+
+    MOVE: 'I'      TO sbudat-sign,
+          'EQ'     TO sbudat-option,
+          '20070801' TO sbudat-low.
+    APPEND sbudat.
+
+*    MOVE: 'I'      TO sbusab-sign,
+*          'EQ'     TO sbusab-option,
+*          '01' TO sbusab-low.
+*    APPEND sbusab.
+
+  ENDIF.
+  pb1 = 'RUN AGING'.
+  pb2 = 'OUTPUT TO EXCEL'.
+  %_X_BELNR_%_app_%-text = 'BILLING DOCUMENT'.
+  %_X_NOTE_%_app_%-text = 'NOTE'.
+  %_y_note_%_app_%-text = 'NOTE'.
+
+  comm004 = 'ENTER UP TO 2 LINES OF COMMENT'.
+
+  xxx1 = 'AGING REPORT'.
+  %_sbukrs_%_app_%-text = 'COMPANY CODE'.
+  %_sbudat_%_app_%-text = 'AGING DATE'.
+  %_sbusab_%_app_%-text = 'ACCOUNTING CLERK'.
+  add = 'ADD'.
+  view = 'VIEW'.
+
+  CONCATENATE '\\Nt-server\Projectstock\Macros\MacrosPublic\'
+              'm_Aging_2010.xls' INTO macro_d.
+
+  concatenate '------------------------------------------------'
+              '------------------------------------------------'
+              '------------------------------------------------'
+              '------------------------------------------------'
+              '------------------------------------------------'
+              '------------------------------------------------'
+              '------------------------------------------------'
+              into line_2.
+  line_1 = line_2.
+
+
+AT LINE-SELECTION.
+  g_field = space.
+  GET CURSOR FIELD g_field.
+  PERFORM line_selection.
+
+AT SELECTION-SCREEN.
+  case sy-ucomm.
+    when '0001'.
+      buttonNo = 1.
+      sscrfields-ucomm = 'ONLI'.
+    when '0002'.
+     buttonNo = 2.
+     sscrfields-ucomm = 'ONLI'.
+  endcase.
+
+START-OF-SELECTION.
+  perform get_data.
+  perform Determine_aging.
+  perform totalize.
+  case buttonNo.
+    when 1.
+     perform write_report.
+    when 2.
+     perform create_file.
+     perform executemacro_on_presserver.
+  endcase.
+
+
+
+
+TOP-OF-PAGE.
+  PERFORM top_of_page.
+
+TOP-OF-PAGE DURING LINE-SELECTION.
+  PERFORM top_of_page.
+
+
+
+
+
+FORM line_selection.
+   PERFORM set_scroll_line.
+
+  CASE g_field.
+    WHEN 'IT_AGING_TOT-EXP'.
+      LOOP AT it_aging_tot WHERE kunnr = it_aging_tot-kunnr.
+        IF it_aging_tot-exp = '-'.
+          it_aging_tot-exp = '+'.
+        ELSE.
+          it_aging_tot-exp = '-'.
+        ENDIF.
+        MODIFY it_aging_tot INDEX syst-tabix.
+      ENDLOOP.
+      PERFORM write_report.
+      PERFORM position_list.
+    WHEN 'ADD'.
+      perform set_scroll_line.
+      perform add_notes.
+      PERFORM write_report.
+      PERFORM position_list.
+    WHEN 'VIEW'.
+      PERFORM set_scroll_line.
+      PERFORM write_commet_history USING it_aging-belnr.
+
+
+  endcase.
+
+endform.
+
+
+
+form Get_Data.
+    DATA: it_zagingt_tmp LIKE zagingt OCCURS 0 WITH HEADER LINE.
+
+    select * from ZAGINGT_NOTES into table it_zagingt_notes
+                                where bukrs = sbukrs-low.
+    SORT it_zagingt_notes BY bukrs belnr erdat DESCENDING
+                                        ertime DESCENDING.
+
+    Select * from zagingt into table it_zagingt_tmp
+           where bukrs in sbukrs.
+*             and busab in sbusab.
+
+    loop at it_zagingt_tmp.
+       if it_zagingt_tmp-busab in sbusab.
+         it_zagingt = it_zagingt_tmp.
+
+         If it_zagingt_tmp-isneg = 'Y'.
+            it_zagingt-dmbtr = it_zagingt_tmp-dmbtr * -1.
+            it_zagingt-wrbtr = it_zagingt_tmp-wrbtr * -1.
+         endif.
+
+         append it_zagingt.
+       endif.
+    endloop.
+
+    sort it_zagingt by name1 duedate.
+
+endform.
+
+
+form Determine_aging.
+  data:  actual_days type i,
+         aging_days type i.
+
+  loop at it_zagingt.
+    clear it_aging.
+
+    if it_zagingt-belnr = '90204651'.
+       aging_days = 5.
+    endif.
+    it_aging-kunnr = it_zagingt-kunnr.     "PartnerNo
+    it_aging-name1 = it_zagingt-name1.     "Name
+    it_aging-belnr = it_zagingt-belnr.     "Doc No
+    it_aging-sgtxt = it_zagingt-sgtxt.     "Text
+    it_aging-doc2  = it_zagingt-doc2.      "Doc2 - assignment
+    it_aging-duedate = it_zagingt-duedate. "Due date
+    it_aging-dmbtr   = it_zagingt-dmbtr.   "amount  - local Cur
+    it_aging-twaers  = it_zagingt-twaers.  "local cur
+    it_aging-wrbtr   = it_zagingt-wrbtr.   "amount - Doc cur
+    it_aging-waers   = it_zagingt-waers.   "amount - Doc cur
+
+    perform date_diff using it_zagingt-duedate
+                            sbudat-low
+                   changing actual_days
+                            aging_days.
+    it_aging-days_past = actual_days.       "days past due
+
+    case aging_days.
+      when 0.
+           it_aging-dayscur = it_zagingt-dmbtr.
+      when 30.
+           it_aging-days30 = it_zagingt-dmbtr.
+      when 60.
+           it_aging-days60 = it_zagingt-dmbtr.
+     when 90.
+           it_aging-days90 = it_zagingt-dmbtr.
+     when 120.
+           it_aging-days120 = it_zagingt-dmbtr.
+    when 121.
+           it_aging-daysov120 = it_zagingt-dmbtr.
+    endcase.
+
+    append it_aging.
+
+  endloop.
+
+endform.
+
+
+form date_diff using startdate type d
+                     enddate type d
+               changing actual_days type i
+                        aging_days type i.
+
+  actual_days = 0.
+  aging_days = 0.
+
+  if startdate > enddate.
+     aging_days = 0.
+     actual_days = 0.
+     else.
+     actual_days = enddate - startdate.
+
+     if actual_days > 0 and actual_days < 31.
+        aging_days = 30.
+        exit.
+     endif.
+
+     if actual_days > 30 and actual_days < 61.
+        aging_days = 60.
+        exit.
+     endif.
+
+     if actual_days > 60 and actual_days < 91.
+        aging_days = 90.
+        exit.
+     endif.
+
+     if actual_days > 90 and actual_days < 121.
+        aging_days = 120.
+        exit.
+     endif.
+
+     if actual_days > 120.
+        aging_days = 121.
+        exit.
+     endif.
+
+  endif.
+
+endform.
+
+
+form write_report.
+  syst-lsind = '0'.
+
+  loop at it_aging_tot.
+    FORMAT COLOR COL_HEADING INTENSIFIED OFF.
+    WRITE: /1 syst-vline NO-GAP,
+            '[' NO-GAP,
+            it_aging_tot-exp NO-GAP HOTSPOT ON,
+            ']'.
+      FORMAT COLOR COL_NORMAL INTENSIFIED ON.
+      write: 6  it_aging_tot-kunnr,
+            14  it_aging_tot-name1,
+            54  '|',
+            56  it_aging_tot-dayscur,
+            73  '|',
+            75  it_aging_tot-days30,
+            92  '|',
+            94  it_aging_tot-days60,
+           111  '|',
+           113  it_aging_tot-days90,
+           130  '|',
+           132  it_aging_tot-days120,
+           149  '|',
+           151  it_aging_tot-daysov120,
+           168  '|'.
+
+      hide: it_aging_tot-kunnr.
+
+      IF it_aging_tot-exp = '-'.
+
+         FORMAT COLOR COL_BACKGROUND.
+
+         perform write_details using it_aging_tot-kunnr.
+
+      endif.
+  endloop.
+
+
+* GRAND TOTAL
+  write: / line_2.
+  read table it_aging_grand_tot index 1.
+  if sy-subrc = 0.
+     write: /6   'GRAND TOTAL',
+            54  '|',
+            56  it_aging_grand_tot-dayscur,
+            73  '|',
+            75  it_aging_grand_tot-days30,
+            92  '|',
+            94  it_aging_grand_tot-days60,
+           111  '|',
+           113  it_aging_grand_tot-days90,
+           130  '|',
+           132  it_aging_grand_tot-days120,
+           149  '|',
+           151  it_aging_grand_tot-daysov120,
+           168  '|'.
+  endif.
+  write: /54 line_1.
+
+endform.
+
+
+form write_details using kunnr like it_aging_tot-kunnr.
+  data: tbx like sy-tabix,
+        c_dmbtr(12) type c,
+        len_sgtxt type i,
+        note_a(130) type c,
+        note_b(130) type c,
+        note_len type i.
+
+  read table it_aging with key kunnr = kunnr.
+
+  if sy-subrc = 0.
+     tbx = sy-tabix.
+
+     write: / line_2.
+
+     loop at it_aging from tbx.
+       if it_aging-kunnr <> kunnr.
+          exit.
+       endif.
+
+       write: /15  'BILLING DOC',
+               38  it_aging-belnr,
+               54  '|',
+               56  it_aging-dayscur,
+               73  '|',
+               75  it_aging-days30,
+               92  '|',
+               94  it_aging-days60,
+              111  '|',
+              113  it_aging-days90,
+              130  '|',
+              132  it_aging-days120,
+              149  '|',
+              151  it_aging-daysov120,
+              168  '|'.
+
+       write: /15 'REF DOC',
+               38 it_aging-doc2 LEFT-JUSTIFIED,
+               54 line_1.
+
+       write: /15 'LOCAL CUR',
+               38 it_aging-dmbtr LEFT-JUSTIFIED,
+                  it_aging-twaers.
+
+       write: /15 'DOCUMENT CUR',
+               38 it_aging-wrbtr LEFT-JUSTIFIED,
+                  it_aging-waers.
+
+       write: /15 'DUE DATE',
+               38 it_aging-duedate LEFT-JUSTIFIED.
+
+       write: /15 'DAYS PAST DUE',
+               38 it_aging-days_past LEFT-JUSTIFIED.
+
+       len_sgtxt = strlen( it_aging-sgtxt ).
+       if len_sgtxt > 1.
+          write: /15 'SGTEXT:',
+                  38 it_aging-sgtxt  LEFT-JUSTIFIED.
+       endif.
+
+       clear: note_a, note_b.
+       read table it_zagingt_notes with key belnr = it_aging-belnr.
+       if sy-subrc = 0.
+          note_len = strlen( it_zagingt_notes-note ).
+          if note_len > 125.
+             note_a = it_zagingt_notes-note+0(125).
+             note_b = it_zagingt_notes-note+125.
+             else.
+             note_a = it_zagingt_notes-note.
+          endif.
+       endif.
+
+       write: /6   ADD COLOR COL_TOTAL hotspot on,
+               10  VIEW COLOR COL_TOTAL hotspot on,
+               15 'LAST COMMENT:',
+               38 note_a LEFT-JUSTIFIED COLOR COL_TOTAL.
+       hide:   it_aging-belnr.   "used by add_notes
+
+       note_len = strlen( note_b ).
+       if note_len > 0.
+          write: /38 note_b LEFT-JUSTIFIED COLOR COL_TOTAL.
+       endif.
+
+
+       write: / line_2.
+
+     endloop.
+
+  endif.
+
+endform.
+
+
+
+form totalize.
+  data: it_aging_tmp like it_aging_tot occurs 0 with header line.
+
+  loop at it_aging.
+
+    MOVE-CORRESPONDING it_aging to it_aging_tmp.
+    COLLECT it_aging_tmp into it_aging_tmp.
+
+    MOVE-CORRESPONDING it_aging to it_aging_grand_tot.
+    COLLECT it_aging_grand_tot into it_aging_grand_tot.
+
+  endloop.
+  sort it_aging_tmp by name1 kunnr.
+
+  loop at it_aging_tmp.
+    MOVE-CORRESPONDING it_aging_tmp to it_aging_tot.
+    it_aging_tot-exp = '+'.
+    append it_aging_tot.
+  endloop.
+
+endform.
+
+
+FORM set_scroll_line.
+  page-cursline = syst-lilli.
+  page-scrlline = syst-lilli - ( syst-curow - page-hdrlines ).
+  page-pgelines = ( page-pagno - 1 ) * syst-linct.
+  page-cpostop = ( page-scrlline + syst-curow ) - page-pgelines.
+  page-cposbot = ( page-scrlline - syst-curow ) - page-pgelines.
+  page-cposit = page-cpostop + page-cposbot.
+  page-twohdrs = page-hdrlines * 2.
+  IF page-cposit LT page-twohdrs.
+    page-scrlline = page-scrlline + 1.
+  ENDIF.
+ENDFORM.                    "SET_SCROLL_LINE
+
+
+*&---------------------------------------------------------------------*
+*&      Form  POSITION_LIST
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM position_list.
+  CALL FUNCTION 'LIST_SCROLL_LINE_TOPMOST'
+    EXPORTING
+      list_index = 1
+      list_line  = page-scrlline
+    EXCEPTIONS
+      OTHERS     = 1.
+  CHECK syst-subrc = 0.
+ENDFORM.                    "POSITION_LIST
+
+
+FORM top_of_page.
+  data: collectors(50) type c.
+* set page-hdrlines = lines in header + 1 system generated blank line
+  page-hdrlines = 8.
+
+  loop at sbusab.
+     CONCATENATE collectors sbusab-low into collectors
+                               separated by space.
+  endloop.
+
+  Write: 'AR AGING'.
+  write: / 'COMPANY CODE:',
+          19 sbukrs-low.
+  write: / 'AGING START DATE:',
+          19 sbudat-low.
+  write: / 'ACCOUNTING CLERK:',
+          19 collectors.
+
+  write: /54 line_1.
+
+  FORMAT COLOR COL_NORMAL INTENSIFIED ON.
+       write: /54   '|',
+               64   'CURRENT' COLOR COL_HEADING,
+               73   '|',
+               81   '1-30 DAYS' COLOR COL_HEADING,
+               92   '|',
+               99   '31-60 DAYS' COLOR COL_HEADING,
+              111   '|',
+              118   '61-90 DAYS' COLOR COL_HEADING,
+              130   '|',
+              136   '91-120 DAYS' COLOR COL_HEADING,
+              149   '|',
+              156   '> 120 DAYS' COLOR COL_HEADING,
+              168   '|'.
+
+  FORMAT COLOR COL_NORMAL INTENSIFIED OFF.
+
+  write: / line_2.
+
+ENDFORM.                    "TOP_OF_PAGE
+
+
+
+
+
+****************************************************************
+****** ADD NOTES TO DB TABLE
+
+FORM add_notes.
+  DATA: ag_notes TYPE ZAGINGT_NOTES,
+        ag_notes_tab TYPE HASHED TABLE
+                     OF ZAGINGT_NOTES
+                     WITH UNIQUE KEY bukrs
+                                     belnr
+                                     erdat
+                                     ertime,
+        tmp_note like ZAGINGT_NOTES-note,
+        txt_date(10) type c.
+
+  CLEAR: x_belnr, x_note, y_note.
+  REFRESH: x_belnr.        ", x_note.
+
+  MOVE: 'I'      TO x_belnr-sign,
+        'EQ'     TO x_belnr-option,
+        it_aging-belnr TO x_belnr-low.  "from hide
+  APPEND x_belnr.
+
+
+  CALL SELECTION-SCREEN 123 STARTING AT 20 150.
+  IF sy-subrc = 0.
+    ag_notes-bukrs = sbukrs-low.
+    ag_notes-belnr = x_belnr-low.
+    ag_notes-erdat = sy-datum.
+    ag_notes-ertime = sy-uzeit.
+    ag_notes-ernam = sy-uname.
+
+    "BUILD NOTE TO UPLOAD
+    perform f_converttolocaldt using sy-datum
+                        changing txt_date.
+    concatenate txt_date sy-uname '-'
+                x_note y_note into tmp_note SEPARATED BY space.
+    ag_notes-note = tmp_note.
+
+    INSERT ag_notes INTO TABLE ag_notes_tab.
+
+    TRY.
+
+        INSERT ZAGINGT_NOTES FROM TABLE ag_notes_tab.
+        IF sy-subrc <> 0.
+          MESSAGE 'Notes table not updated'
+                            TYPE 'I'
+                            DISPLAY LIKE 'E'.
+        ENDIF.
+
+      CATCH cx_root.    " CATCH cx_sy_open_sql_db.
+        MESSAGE 'Notes table not updated'
+                             TYPE 'I'
+                             DISPLAY LIKE 'E'.
+    ENDTRY.
+
+    it_zagingt_notes-bukrs = sbukrs-low.
+    it_zagingt_notes-belnr = x_belnr-low.
+    it_zagingt_notes-erdat = sy-datum.
+    it_zagingt_notes-ertime = sy-uzeit.
+    it_zagingt_notes-ernam = sy-uname.
+    it_zagingt_notes-note = tmp_note.
+    APPEND it_zagingt_notes.
+    SORT it_zagingt_notes BY bukrs belnr erdat DESCENDING
+                                        ertime DESCENDING.
+  ENDIF.
+
+ENDFORM.                    "add_notes
+
+
+FORM write_commet_history USING acctdoc like it_aging-belnr.
+  data: note_a(130) type c,
+        note_b(130) type c,
+        note_len type i.
+
+  skip 3.
+  WRITE: /1(130) 'NOTES FOR BILLING DOCUMENT:' COLOR COL_HEADING,
+         28      acctdoc COLOR COL_HEADING.
+
+  loop at it_zagingt_notes where belnr = acctdoc.
+
+     skip 1.
+
+     clear: note_a, note_b.
+     note_len = strlen( it_zagingt_notes-note ).
+     if note_len > 125.
+         note_a = it_zagingt_notes-note+0(125).
+         note_b = it_zagingt_notes-note+125.
+         else.
+         note_a = it_zagingt_notes-note.
+     endif.
+
+     write: /1 note_a+0(20).
+     write: /1(130) note_a+20 LEFT-JUSTIFIED COLOR COL_TOTAL.
+
+     note_len = strlen( note_b ).
+     if note_len > 0.
+       write: /1 note_b LEFT-JUSTIFIED COLOR COL_TOTAL.
+     endif.
+
+  endloop.
+
+endform.
+
+
+
+
+FORM create_file.
+  data: xnote(255) type c.
+  CLEAR it_dl.
+  REFRESH it_dl.
+
+*  xstr = 'TOTAL'.       PERFORM format_line CHANGING xstr.
+  xstr = 'CUSTOMER'.     PERFORM format_line CHANGING xstr.
+  xstr = 'PARTNER'.     PERFORM format_line CHANGING xstr.
+  xstr = 'NAME'.        PERFORM format_line CHANGING xstr.
+  xstr = 'DOCUMENT NO'. PERFORM format_line CHANGING xstr.
+  xstr = 'SGTXT'.       PERFORM format_line CHANGING xstr.
+  xstr = 'PARTNER DOC'. PERFORM format_line CHANGING xstr.
+  xstr = 'DUE DATE'.    PERFORM format_line CHANGING xstr.
+  xstr = 'DAYS'.        PERFORM format_line CHANGING xstr.
+  xstr = 'AMOUNT'.      PERFORM format_line CHANGING xstr.
+  xstr = 'CURRENT'.     PERFORM format_line CHANGING xstr.
+  xstr = '1-30 DAYS'.   PERFORM format_line CHANGING xstr.
+  xstr = '31-60 DAYS'.  PERFORM format_line CHANGING xstr.
+  xstr = '61-90 DAYS'.  PERFORM format_line CHANGING xstr.
+  xstr = '91-120 DAYS'. PERFORM format_line CHANGING xstr.
+  xstr = '>120 DAYS'.   PERFORM format_line CHANGING xstr.
+  xstr = 'NOTE'.        PERFORM format_line CHANGING xstr.
+
+  APPEND it_dl.
+
+    sort it_aging by name1.
+
+    loop at it_aging.
+
+      CLEAR it_dl.
+
+      shift it_aging-kunnr LEFT DELETING LEADING '0'.      "customer
+      concatenate it_aging-kunnr '-' it_aging-name1 into xstr
+                  SEPARATED BY space.
+      PERFORM format_line CHANGING xstr.
+
+      xstr = it_aging-kunnr.                "partner
+      PERFORM format_line CHANGING xstr.
+
+      xstr = it_aging-name1.                "name
+      PERFORM format_line CHANGING xstr.
+
+      xstr = it_aging-belnr.
+      PERFORM format_line CHANGING xstr.    "Document no
+
+      xstr = it_aging-sgtxt.
+      perform f_cleantext changing xstr.
+      PERFORM format_line CHANGING xstr.    "sgtxt
+
+      xstr = it_aging-doc2.
+      PERFORM format_line CHANGING xstr.    "partner doc
+
+      PERFORM f_converttolocaldt USING it_aging-duedate CHANGING xstr.
+      PERFORM format_line CHANGING xstr.    "due date
+
+      PERFORM f_move_minus_sign CHANGING it_aging-days_past xstr.
+      PERFORM format_line CHANGING xstr.
+
+      PERFORM f_move_minus_sign CHANGING it_aging-dmbtr xstr.
+      PERFORM format_line CHANGING xstr.
+
+      PERFORM f_move_minus_sign CHANGING it_aging-dayscur xstr.
+      PERFORM format_line CHANGING xstr.
+
+      PERFORM f_move_minus_sign CHANGING it_aging-days30 xstr.
+      PERFORM format_line CHANGING xstr.
+
+      PERFORM f_move_minus_sign CHANGING it_aging-days60 xstr.
+      PERFORM format_line CHANGING xstr.
+
+      PERFORM f_move_minus_sign CHANGING it_aging-days90 xstr.
+      PERFORM format_line CHANGING xstr.
+
+      PERFORM f_move_minus_sign CHANGING it_aging-days120 xstr.
+      PERFORM format_line CHANGING xstr.
+
+      PERFORM f_move_minus_sign CHANGING it_aging-daysov120 xstr.
+      PERFORM format_line CHANGING xstr.
+
+      read table it_zagingt_notes with key belnr = it_aging-belnr.
+      if sy-subrc = 0.
+         xnote = it_zagingt_notes-note.    "note
+         else.
+         xnote = ' '.
+      endif.
+      perform f_cleantext changing xnote.
+      PERFORM format_line CHANGING xnote.
+
+      APPEND it_dl.
+   endloop.
+
+
+
+  IF NOT sy-batch = 'X'.    "if not batch
+    out_file = 'C:\temp\data_Aging_2010.csv'.
+    PERFORM u_send_to_file.
+  ENDIF.
+
+ENDFORM.                    "create_file
+
+
+****************************************************
+********* CREATE OUTPUT FILE ***********************
+FORM notcreate_file.
+  data: xnote(255) type c.
+  CLEAR it_dl.
+  REFRESH it_dl.
+
+  xstr = 'TOTAL'.       PERFORM format_line CHANGING xstr.
+  xstr = 'CUSTOMER'.     PERFORM format_line CHANGING xstr.
+  xstr = 'PARTNER'.     PERFORM format_line CHANGING xstr.
+  xstr = 'NAME'.        PERFORM format_line CHANGING xstr.
+  xstr = 'DOCUMENT NO'. PERFORM format_line CHANGING xstr.
+  xstr = 'SGTXT'.       PERFORM format_line CHANGING xstr.
+  xstr = 'PARTNER DOC'. PERFORM format_line CHANGING xstr.
+  xstr = 'DUE DATE'.    PERFORM format_line CHANGING xstr.
+  xstr = 'DAYS'.        PERFORM format_line CHANGING xstr.
+  xstr = 'AMOUNT'.      PERFORM format_line CHANGING xstr.
+  xstr = 'CURRENT'.     PERFORM format_line CHANGING xstr.
+  xstr = '1-30 DAYS'.   PERFORM format_line CHANGING xstr.
+  xstr = '31-60 DAYS'.  PERFORM format_line CHANGING xstr.
+  xstr = '61-90 DAYS'.  PERFORM format_line CHANGING xstr.
+  xstr = '91-120 DAYS'. PERFORM format_line CHANGING xstr.
+  xstr = '>120 DAYS'.   PERFORM format_line CHANGING xstr.
+  xstr = 'NOTE'.        PERFORM format_line CHANGING xstr.
+
+  APPEND it_dl.
+
+  LOOP AT it_aging_tot.
+
+    CLEAR it_dl.
+
+    xstr = 'X'.                           "total
+    PERFORM format_line CHANGING xstr.
+
+                                          "customer
+    concatenate it_aging_tot-kunnr '|' it_aging_tot-name1 into xstr.
+    PERFORM format_line CHANGING xstr.
+
+    xstr = it_aging_tot-kunnr.            "partner
+    PERFORM format_line CHANGING xstr.
+
+    xstr = it_aging_tot-name1.            "name
+    PERFORM format_line CHANGING xstr.
+
+    xstr = ' '.
+    PERFORM format_line CHANGING xstr.    "Document no
+    PERFORM format_line CHANGING xstr.    "sgtxt
+    PERFORM format_line CHANGING xstr.    "partner doc
+    PERFORM format_line CHANGING xstr.    "due date
+    PERFORM format_line CHANGING xstr.    "days past
+
+    PERFORM f_move_minus_sign CHANGING it_aging_tot-dmbtr xstr.
+    PERFORM format_line CHANGING xstr.
+
+    PERFORM f_move_minus_sign CHANGING it_aging_tot-dayscur xstr.
+    PERFORM format_line CHANGING xstr.
+
+    PERFORM f_move_minus_sign CHANGING it_aging_tot-days30 xstr.
+    PERFORM format_line CHANGING xstr.
+
+    PERFORM f_move_minus_sign CHANGING it_aging_tot-days60 xstr.
+    PERFORM format_line CHANGING xstr.
+
+    PERFORM f_move_minus_sign CHANGING it_aging_tot-days90 xstr.
+    PERFORM format_line CHANGING xstr.
+
+    PERFORM f_move_minus_sign CHANGING it_aging_tot-days120 xstr.
+    PERFORM format_line CHANGING xstr.
+
+    PERFORM f_move_minus_sign CHANGING it_aging_tot-daysov120 xstr.
+    PERFORM format_line CHANGING xstr.
+
+    xstr = ' '.                           "note
+    PERFORM format_line CHANGING xstr.
+
+    append it_dl.
+
+    loop at it_aging where kunnr = it_aging_tot-kunnr.
+
+      CLEAR it_dl.
+
+      xstr = ' '.                           "total
+      PERFORM format_line CHANGING xstr.
+                                          "customer
+      concatenate it_aging-kunnr '|' it_aging-name1 into xstr.
+      PERFORM format_line CHANGING xstr.
+
+      xstr = it_aging-kunnr.                "partner
+      PERFORM format_line CHANGING xstr.
+
+      xstr = it_aging-name1.                "name
+      PERFORM format_line CHANGING xstr.
+
+      xstr = it_aging-belnr.
+      PERFORM format_line CHANGING xstr.    "Document no
+
+      xstr = it_aging-sgtxt.
+      perform f_cleantext changing xstr.
+      PERFORM format_line CHANGING xstr.    "sgtxt
+
+      xstr = it_aging-doc2.
+      PERFORM format_line CHANGING xstr.    "partner doc
+
+      PERFORM f_converttolocaldt USING it_aging-duedate CHANGING xstr.
+      PERFORM format_line CHANGING xstr.    "due date
+
+      PERFORM f_move_minus_sign CHANGING it_aging-days_past xstr.
+      PERFORM format_line CHANGING xstr.
+
+      PERFORM f_move_minus_sign CHANGING it_aging-dmbtr xstr.
+      PERFORM format_line CHANGING xstr.
+
+      PERFORM f_move_minus_sign CHANGING it_aging-dayscur xstr.
+      PERFORM format_line CHANGING xstr.
+
+      PERFORM f_move_minus_sign CHANGING it_aging-days30 xstr.
+      PERFORM format_line CHANGING xstr.
+
+      PERFORM f_move_minus_sign CHANGING it_aging-days60 xstr.
+      PERFORM format_line CHANGING xstr.
+
+      PERFORM f_move_minus_sign CHANGING it_aging-days90 xstr.
+      PERFORM format_line CHANGING xstr.
+
+      PERFORM f_move_minus_sign CHANGING it_aging-days120 xstr.
+      PERFORM format_line CHANGING xstr.
+
+      PERFORM f_move_minus_sign CHANGING it_aging-daysov120 xstr.
+      PERFORM format_line CHANGING xstr.
+
+      read table it_zagingt_notes with key belnr = it_aging-belnr.
+      if sy-subrc = 0.
+         xnote = it_zagingt_notes-note.    "note
+         else.
+         xnote = ' '.
+      endif.
+      perform f_cleantext changing xnote.
+      PERFORM format_line CHANGING xnote.
+
+      APPEND it_dl.
+   endloop.
+
+
+  ENDLOOP.
+
+  IF NOT sy-batch = 'X'.    "if not batch
+    out_file = 'C:\temp\data_Aging_2010.csv'.
+    PERFORM u_send_to_file.
+  ENDIF.
+
+ENDFORM.                    "create_file
+
+
+
+FORM format_line CHANGING xline.
+  DATA: xstr(255) TYPE c.
+  xstr = xline.
+
+  IF xstr = space.
+    CONCATENATE it_dl-str
+                '" ",'
+                INTO it_dl-str.
+  ELSE..
+    CONCATENATE it_dl-str
+                '"'
+                xstr
+                '",'
+                INTO it_dl-str.
+  ENDIF.
+ENDFORM.                    "format_line
+
+
+****************************************************
+form f_converttolocaldt using dt type d
+                        changing dtout type c.
+  data: xstr(20) type c.
+
+  call function 'CONVERT_DATE_TO_EXTERNAL'
+   exporting
+     date_internal                  = dt
+   importing
+     date_external                  = xstr
+*   EXCEPTIONS
+*     DATE_INTERNAL_IS_INVALID       = 1
+*     OTHERS                         = 2
+            .
+  if sy-subrc <> 0.
+* MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+*         WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+  endif.
+
+  dtout = xstr.
+
+endform.                    "F_converttolocaldt
+
+
+
+form f_cleantext changing strtext.
+  data: xstring(255),
+*        xstring(70),
+        xlen type i,
+        xchr(1),
+        n type i,
+        nn type i,
+        xtabix like sy-tabix.
+
+  xlen = strlen( strtext ).
+  clear: xstring.
+  n = '-1'.
+  nn = '-1'.
+
+  do xlen times.
+    add 1 to n.
+    if n < xlen.
+      xchr =  strtext+n(1).
+
+      if xchr = '"' or
+         xchr = '=' or
+         xchr = '&' or
+         xchr = '<' or
+         xchr = ',' or
+         xchr = '>'.
+        xchr = space.
+      endif.
+
+      if xchr > '&' and " See if it is a single quote
+         xchr < '('.
+        xchr = space.
+      endif.
+
+      add 1 to nn.
+      xstring+nn(1) = xchr.
+    endif.
+  enddo.
+  strtext = xstring.
+
+endform.                    "F_cleantext_lines
+
+
+FORM u_send_to_file.
+  DATA: exe_path(128)  TYPE c.
+
+  CALL METHOD cl_gui_frontend_services=>gui_download
+    EXPORTING
+*    BIN_FILESIZE              =
+      filename                  = out_file
+      filetype                  = 'ASC'
+*    APPEND                    = SPACE
+      write_field_separator     = 'X'
+*    HEADER                    = '00'
+*    TRUNC_TRAILING_BLANKS     = SPACE
+*    WRITE_LF                  = 'X'
+*    COL_SELECT                = SPACE
+*    COL_SELECT_MASK           = SPACE
+      dat_mode                  = 'X'
+*    CONFIRM_OVERWRITE         = SPACE
+*    NO_AUTH_CHECK             = SPACE
+*    CODEPAGE                  = SPACE
+*    IGNORE_CERR               = ABAP_TRUE
+*    REPLACEMENT               = '#'
+*    WRITE_BOM                 = SPACE
+*    TRUNC_TRAILING_BLANKS_EOL = 'X'
+*    WK1_N_FORMAT              = SPACE
+*    WK1_N_SIZE                = SPACE
+*    WK1_T_FORMAT              = SPACE
+*    WK1_T_SIZE                = SPACE
+*  IMPORTING
+*    FILELENGTH                =
+    CHANGING
+      data_tab                  = it_dl[]
+    EXCEPTIONS
+      file_write_error          = 1
+      no_batch                  = 2
+      gui_refuse_filetransfer   = 3
+      invalid_type              = 4
+      no_authority              = 5
+      unknown_error             = 6
+      header_not_allowed        = 7
+      separator_not_allowed     = 8
+      filesize_not_allowed      = 9
+      header_too_long           = 10
+      dp_error_create           = 11
+      dp_error_send             = 12
+      dp_error_write            = 13
+      unknown_dp_error          = 14
+      access_denied             = 15
+      dp_out_of_memory          = 16
+      disk_full                 = 17
+      dp_timeout                = 18
+      file_not_found            = 19
+      dataprovider_exception    = 20
+      control_flush_error       = 21
+      not_supported_by_gui      = 22
+      error_no_gui              = 23
+      OTHERS                    = 24
+          .
+  IF sy-subrc <> 0.
+* MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+*            WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+  ENDIF.
+
+ENDFORM.                    "u_send_to_file
+
+
+
+*&---------------------------------------------------------------------*
+*&      Form  executemacro_on_presserver
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+form executemacro_on_presserver.
+  data: fileexe(128) type c.
+
+  call function 'SO_PROGNAME_GET_WITH_PATH'
+       exporting
+            doctype           = 'XLS'
+      importing
+            pathname          =  fileexe
+*    TABLES
+*         RE                =
+       exceptions
+            path_not_found    = 1
+            program_not_found = 2
+            no_batch          = 3
+            x_error           = 4
+            others            = 5.
+
+
+  call function 'WS_EXECUTE'
+   exporting
+*   DOCUMENT                 = ' '
+*   CD                       = ' '
+     commandline             = macro_d
+*   INFORM                   = ' '
+     program                 = fileexe
+*   STAT                     = ' '
+*   WINID                    = ' '
+*   OSMAC_SCRIPT             = ' '
+*   OSMAC_CREATOR            = ' '
+*   WIN16_EXT                = ' '
+*   EXEC_RC                  = ' '
+* IMPORTING
+*   RBUFF                    =
+   exceptions
+     frontend_error           = 1
+     no_batch                 = 2
+     prog_not_found           = 3
+     illegal_option           = 4
+     gui_refuse_execute       = 5
+     others                   = 6.
+
+endform.                    "EXECUTEMACRO_ON_PRESSERVER
+
+
+FORM f_move_minus_sign CHANGING p_amount strvalue.
+
+* check if negative amount
+  IF p_amount LT 0.
+    p_amount = ABS( p_amount ).
+    strvalue = p_amount.
+    SHIFT strvalue RIGHT DELETING TRAILING ' '.
+    SHIFT strvalue LEFT DELETING LEADING ' '.
+    CONCATENATE '-' strvalue INTO strvalue.
+
+  ELSE.
+    strvalue = p_amount.
+    SHIFT strvalue RIGHT DELETING TRAILING ' '.
+    SHIFT strvalue LEFT DELETING LEADING ' '.
+  ENDIF.
+ENDFORM.                    " F_move_minus_sign
