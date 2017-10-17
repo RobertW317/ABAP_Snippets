@@ -1,0 +1,126 @@
+
+*&--------------------------------------------------------------------*
+*&      Form  Write_ClrDoc
+*&--------------------------------------------------------------------*
+*       text
+*---------------------------------------------------------------------*
+*      -->DOCNO      text
+*      -->INDENT     text
+*---------------------------------------------------------------------*
+form write_clrdoc using docno like bsad-belnr
+                        indent type i.
+  data: desc like t003t-ltext,
+        desc2 like biw_tbslt-ltext,
+        i_docno like it_bsad-augbl,
+        i_clrdt type d,
+        i_indent type i.
+
+  data: ctr0 type i, ctr1 type i, ctr2 type i, ctr3 type i,
+        ctr4 type i,
+        ctr5 type i, ctr6 type i, ctr7 type i, ctr8 type i,
+        ctr9 type i, ctr10 type i, ctr11 type i, ctr12 type i,
+        ctr13 type i, ctr14 type i, ctr15 type i, ctr16 type i,
+        ctr17 type i, ctr18 type i, ctr2a type i, ctr2b type i.
+  data: i_color(1) type c.
+
+  ctr0 = indent + 0.
+  ctr1 = indent + 5.
+  ctr2 = indent + 16.
+  ctr2a = indent + 20.
+  ctr2b = indent + 23.
+  ctr3 = indent + 44.
+  ctr4 = indent + 55.
+  ctr5 = indent + 58.
+  ctr6 = indent + 70.
+  ctr7 = indent + 86.
+  ctr8 = indent + 97.
+  ctr9 = indent + 116.
+  ctr10 = indent + 128.
+  ctr11 = indent + 139.
+  ctr12 = indent + 155.
+  ctr13 = indent + 171.
+  ctr14 = indent + 175.
+
+  read table it_bsad with key belnr = docno.
+  if sy-subrc = 0.
+
+    write at: /ctr1(14) 'DOC NO' color 1 intensified on,
+            ctr2(27) 'PK' color 1 intensified on,      "it_bsad-bschl ,
+            ctr3(10) 'ClearDoc' color 1 intensified on,
+            ctr4(3)  '+' color 1 intensified on,
+            ctr5(10) 'ClearDt' color 1,
+            ctr6(15) 'AMOUNT' color 1 intensified on right-justified,
+            ctr7(10) 'REF' color 1  intensified on,  "'it_bsad-xblnr',
+            ctr8(18) 'ASSIGNMENT' color 1  intensified on,
+            ctr9(10) 'BILL DOC' color 1  intensified on,
+            ctr10(10) 'INV' color 1  intensified on,
+            ctr11(15) 'WRBTR doccur' color 1  intensified on,
+            ctr12(15) 'PSWBT GL' color 1  intensified on,
+            ctr13(4)  'blart' color 1  intensified on,
+            ctr14(50) 'sgtxt' color 1 intensified on.
+
+  endif.
+
+  loop at it_bsid where belnr = docno.
+
+    perform getpostkeydesc using it_bsid-bschl
+                                     it_bsid-umskz
+                            changing desc2.
+
+    write at: /ctr0(1)  'O',
+            ctr1(10)     it_bsid-belnr  color 7,
+            ctr2(3)      it_bsid-bschl color 7,
+            ctr2a(2)     it_bsid-umskz color 7,
+            ctr2b(20)    desc2 color 7,
+            ctr3(10)     it_bsid-augbl color 7,
+            ctr4(3)      it_bsid-shkzg color 7,
+            ctr5(10)     it_bsid-augdt color 7,
+            ctr6(15)     it_bsid-dmbtr color 7,
+            ctr7(15)     it_bsid-xblnr color 7,
+            ctr8(15)     it_bsid-zuonr color 7,
+            ctr9(10)     it_bsid-vbeln color 7,
+            ctr10(10)    it_bsid-rebzg color 7,
+            ctr11(15)    it_bsid-wrbtr color 7,
+            ctr12(15)    it_bsid-pswbt color 7,
+            ctr13(4)     it_bsid-blart color 7,
+            ctr14(50)    it_bsid-sgtxt color 7.
+
+  endloop.
+
+  loop at it_bsad where belnr = docno.
+
+    perform getpostkeydesc using it_bsad-bschl
+                                     it_bsad-umskz
+                            changing desc2.
+
+    write at: /ctr0(1) 'C',
+            ctr1(10) it_bsad-belnr,
+            ctr2(3)     it_bsad-bschl,
+            ctr2a(2)    it_bsad-umskz,
+            ctr2b(20)   desc2,
+            ctr3(10)    it_bsad-augbl,
+            ctr4(3)     it_bsad-shkzg,
+            ctr5(10)    it_bsad-augdt color 5,
+            ctr6(15)    it_bsad-dmbtr,
+            ctr7(15)    it_bsad-xblnr,
+            ctr8(15)    it_bsad-zuonr,
+            ctr9(10)    it_bsad-vbeln,
+            ctr10(10)   it_bsad-rebzg,
+            ctr11(15)   it_bsad-wrbtr,
+            ctr12(15)   it_bsad-pswbt,
+            ctr13(4)    it_bsad-blart,
+            ctr14(50)   it_bsad-sgtxt.
+
+    if not it_bsad-augbl is initial.
+      if it_bsad-augbl <> docno.
+        skip 1.
+        i_docno  = it_bsad-augbl.
+        i_indent  = indent + 5.
+        perform write_clrdoc using i_docno
+                                   i_indent.
+        skip 1.
+      endif.
+    endif.
+
+  endloop.
+endform.                    "Write_ClrDoc
