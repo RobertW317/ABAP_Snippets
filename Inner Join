@@ -1,0 +1,128 @@
+
+INNER JOIN in open SQL 
+
+The condition in the ON clause has some limittations. See below.
+
+INNER JOIN
+
+One or more lines on the right-hand table is linked to a line in the
+left-hand table. Lines from the left-handed table
+is only selected if they meet the ON criteria.
+
+
+                   FROM from vbak as a inner join vbap as b
+                             ON b~vbeln = a~vbeln.
+
+One or more lines from vbap is selected for each line in vbak.
+
+Limits on the ON clause:
+
+
+LEFT OUTER JOIN
+
+The left outer join read lines from the left-handed table EVEN if there is
+
+no corresponding line in the right hand table.
+
+                   FROM vbak as a left outer join vbap as b
+                             ON b~vbeln = a~vbeln.
+
+If  vbap does not contain any lines that meets the condition, a single line
+where the values from vbap is filled with null values.
+
+
+Example 1
+
+SELECT a~zafstemnr b~zafstemnr b~zsaknr                
+    INTO CORRESPONDING FIELDS OF TABLE i_tab             
+    FROM zcostafstm as a INNER JOIN zcostplan as b       
+    ON b~zafstemnr = a~zafstemnr.                        
+
+
+
+Example 2
+
+SELECT lips~vbeln lips~lfimg likp~wadat 
+
+    INTO corresponding fields of table ltab_orders 
+    FROM lips JOIN likp on ( lips~vbeln = likp~vbeln ) 
+                       JOIN vbfa on ( lips~vbeln = vbfa~vbelv ) 
+   WHERE      lips~matnr = matnr 
+                      and lips~vbeln in vbeln 
+                      and likp~vbeln in vbeln 
+                      and vbfa~vbelv in vbeln 
+                      and lips~werks in werks 
+                      and likp~wadat in datum 
+                      and vbfa~vbtyp_n = 'Q' "WMS transfer order 
+                     and vbfa~vbtyp_v = 'J'. "Delivery 
+
+From ABAP hints & Tips:  http://oasis.fortunecity.com/skegness/110/JOIN.html
+
+
+
+
+***** examples
+
+
+  CLEAR it_ekpo.
+  REFRESH it_ekpo.
+
+  SELECT f~ebeln f~ebelp f~ematn f~txz01 f~menge f~meins f~loekz
+         f~werks f~matnr f~netwr f~knttp f~netpr f~retpo f~ematn
+         f~matkl f~bprme f~peinh f~labnr f~wepos f~weunb f~elikz
+         f~kunnr f~adrnr f~emlif f~adrn2
+      INTO (it_ekpo-ebeln, it_ekpo-ebelp, it_ekpo-ematn,
+             it_ekpo-txz01, it_ekpo-menge, it_ekpo-meins,
+             it_ekpo-loekz, it_ekpo-werks, it_ekpo-matnr,
+             it_ekpo-netwr, it_ekpo-knttp, it_ekpo-netpr,
+             it_ekpo-retpo, it_ekpo-ematn, it_ekpo-matkl,
+             it_ekpo-bprme, it_ekpo-peinh, it_ekpo-labnr,
+             it_ekpo-wepos, it_ekpo-weunb, it_ekpo-elikz,
+             it_ekpo-kunnr, it_ekpo-adrnr, it_ekpo-emlif,
+             it_ekpo-adrn2 )
+      FROM ekpo AS f INNER JOIN ekko AS p
+            ON f~ebeln = p~ebeln
+            WHERE p~bedat IN xbedat AND
+            f~ebeln IN xebeln AND
+            f~werks IN xwerks AND
+            f~netpr in xnetpr and
+            f~knttp IN xknttp AND
+            f~matkl IN xmatkl AND
+            f~bstyp IN xbstyp AND
+            p~ekgrp IN xekgrp and
+            p~lifnr IN vendorno.
+    APPEND it_ekpo.
+  ENDSELECT.
+
+* double inner join
+
+
+SELECT ekpo~ebeln ekpo~ebelp ekpo~ematn ekpo~txz01 ekpo~menge
+       ekpo~meins ekpo~loekz ekpo~werks ekpo~matnr ekpo~netwr
+       ekpo~knttp ekpo~netpr ekpo~retpo ekpo~ematn ekpo~matkl
+       ekpo~bprme ekpo~peinh ekpo~labnr ekpo~wepos ekpo~weunb
+       ekpo~elikz ekpo~kunnr ekpo~adrnr ekpo~emlif ekpo~adrn2
+      INTO (it_ekpo-ebeln, it_ekpo-ebelp, it_ekpo-ematn,
+             it_ekpo-txz01, it_ekpo-menge, it_ekpo-meins,
+             it_ekpo-loekz, it_ekpo-werks, it_ekpo-matnr,
+             it_ekpo-netwr, it_ekpo-knttp, it_ekpo-netpr,
+             it_ekpo-retpo, it_ekpo-ematn, it_ekpo-matkl,
+             it_ekpo-bprme, it_ekpo-peinh, it_ekpo-labnr,
+             it_ekpo-wepos, it_ekpo-weunb, it_ekpo-elikz,
+             it_ekpo-kunnr, it_ekpo-adrnr, it_ekpo-emlif,
+             it_ekpo-adrn2 )
+      FROM ( ekpo INNER JOIN ekko
+            ON ekpo~ebeln = ekko~ebeln )
+            inner join eket on ( ekpo~ebeln = eket~ebeln and
+                                 ekpo~ebelp = eket~ebelp )
+            WHERE eket~bedat IN xbedat AND
+            ekpo~ebeln IN xebeln AND
+            ekpo~werks IN xwerks AND
+            ekpo~netpr in xnetpr and
+            ekpo~knttp IN xknttp AND
+            ekpo~matkl IN xmatkl AND
+            ekpo~bstyp IN xbstyp AND
+            ekko~ekgrp IN xekgrp and
+            ekko~lifnr IN vendorno.
+    APPEND it_ekpo.
+  ENDSELECT.
