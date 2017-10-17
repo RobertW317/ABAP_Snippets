@@ -1,0 +1,21 @@
+
+Show a progress bar via ABAP
+
+This process is very easy. You just code and use SAP's ready-made function,
+SAPGUI_PROGRESS_INDICATOR, at the appropriate points. Below
+is a simple example:
+
+REPORT YPROGIND.
+
+DATA: A LIKE SY-UCOMM.
+
+DO 100 TIMES.
+DO 300 TIMES.
+GET TIME.
+ENDDO.
+A(3) = SY-INDEX.A+3 = '%'.
+CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+EXPORTING
+PERCENTAGE = SY-INDEX
+TEXT = A.
+ENDDO.
