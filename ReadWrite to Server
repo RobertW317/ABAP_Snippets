@@ -1,0 +1,31 @@
+form send_serverfile using fname1 fname2.  
+  data: servfile like rlgrap-filename.
+  
+* WRITE COPY TO NT-SERVER  
+  concatenate us_file '_' fname1 '_' fname2 '.csv' into servfile.
+  open dataset servfile for output in text mode encoding default.  
+  loop at it_dl.    
+    transfer it_dl to servfile. 
+  endloop.  
+  close dataset servfile.
+endform.                    "Send_ServerFile
+
+
+form OpenServerFile.
+  data: oipreportfile like rlgrap-filename.
+  concatenate '\\Nt-server\source\OIPDownload\'
+               sy-sysid            
+               'oipreport3.txt'            
+               into oipreportfile.
+               
+ open dataset oipreportfile for input in binary mode.
+ do.  
+  read dataset oipreportfile into oipreport2.  
+  if sy-subrc <> 0.    
+      exit.  
+      else.    
+      append oipreport2.  
+   endif.
+ enddo.
+ close dataset oipreportfile.
+endform.
