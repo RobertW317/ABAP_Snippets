@@ -1,0 +1,28 @@
+
+form writenode using fieldname fieldvalue.
+  data: strt type string, strc(15) type c,
+       chk(1) type c.
+
+  chk = '0'.
+  strt = fieldvalue.
+
+  concatenate '<' fieldname '>'
+                  strt
+              '</' fieldname '>' into it_dl-str.
+  append it_dl.
+*  write: / it_dl-str.
+
+endform.                    "WriteNode
+
+form writehalfndopen using fieldname.
+  concatenate '<' fieldname '>'  into it_dl-str.
+  append it_dl.
+*  write: / it_dl-str.
+endform.                    "writeHalfNdOpen
+
+
+form writehalfndclose using fieldname.
+  concatenate '</' fieldname '>'  into it_dl-str.
+  append it_dl.
+*  write: / it_dl-str.
+endform.                    "writeHalfNdClose
