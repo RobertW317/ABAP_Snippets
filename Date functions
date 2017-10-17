@@ -1,0 +1,88 @@
+
+
+SPAN {
+font-family: "Courier New";
+font-size: 10pt;
+color: #000000;
+background: #FFFFFF;
+}
+.L0S31 {
+font-style: italic;
+color: #808080;
+}
+.L0S32 {
+color: #3399FF;
+}
+.L0S33 {
+color: #4DA619;
+}
+.L0S52 {
+color: #0000FF;
+}
+.L0S55 {
+color: #800080;
+}
+.L0S70 {
+color: #808080;
+}
+
+form dt_to_wk using dt changing xstr.
+   data: F_dt LIKE SCAL-DATE,
+         F_wk LIKE SCAL-WEEK.
+
+    call function 'DATE_CHECK_PLAUSIBILITY'
+      exporting
+        date                            = dt
+     EXCEPTIONS
+       PLAUSIBILITY_CHECK_FAILED       = 1
+*       OTHERS                          = 2
+              .
+    if sy-subrc <> 0.
+       xstr = ''.
+       exit.
+
+     MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+             WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+    endif.
+
+    F_dt = dt.
+
+    call function 'DATE_GET_WEEK'
+      exporting
+        date               = f_dt
+     IMPORTING
+       WEEK               = f_wk
+*     EXCEPTIONS
+*       DATE_INVALID       = 1
+*       OTHERS             = 2
+              .
+    if sy-subrc <> 0.
+*     MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+*             WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+    endif.
+
+    xstr = f_wk.
+endform.
+
+***************************************************************************
+FORM f_converttolocaldt USING dt TYPE d
+                        CHANGING dtout TYPE c.
+  DATA: xstr(20) TYPE c.
+
+  CALL FUNCTION 'CONVERT_DATE_TO_EXTERNAL'
+   EXPORTING
+     date_internal                  = dt
+   IMPORTING
+     date_external                  = xstr
+*   EXCEPTIONS
+*     DATE_INTERNAL_IS_INVALID       = 1
+*     OTHERS                         = 2
+            .
+  IF sy-subrc <> 0.
+* MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+*         WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+  ENDIF.
+
+  dtout = xstr.
+
+ENDFORM.                    "F_converttolocaldt
