@@ -121,3 +121,43 @@ FORM calculate_date USING p_months
     IMPORTING
       NEWDATE       = p_date.
 ENDFORM.                    " CALCULATE_DATE
+
+
+
+  call function 'MONTH_PLUS_DETERMINE'
+    exporting
+      months  = -1       " Negative to subtract
+      olddate = sy-datum
+    importing
+      newdate = new_date.
+
+
+  call function 'DATE_TO_PERIOD_CONVERT'
+       exporting
+            i_date         = new_date
+*         I_MONMIT       = 00
+            i_periv        = 'K4'
+       importing
+            e_buper        = x_per
+            e_gjahr        = x_yr
+       exceptions
+            input_false    = 1
+            t009_notfound  = 2
+            t009b_notfound = 3
+            others         = 4.
+
+
+
+
+
+
+form convertdate changing sdate type c.
+  condense sdate.
+  data: smo(2) type c.
+  data: syr(4) type c.
+  data: sdy(2) type c.
+  smo = sdate+4(2).
+  syr = sdate+0(4).
+  sdy = sdate+6(2).
+  concatenate smo sdy syr into  sdate separated by '/'.
+endform.                    "ConvertDate
