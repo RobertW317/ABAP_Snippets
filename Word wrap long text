@@ -1,0 +1,21 @@
+* Long Text formatting function
+
+* Does anyone know of a long text formatting function delivered by SAP.  
+* I need to take LINES returned from READ_TEXT and send it to another 
+* function that will return LINES with a maximum of N character long 
+* lines broken at a word.  I was about to write one but since INCLUDE 
+* in SAPscript preforms this exact function,
+* I have to believe that there is an SAP function that does this.
+
+* Try TEXT_SPLIT
+
+call function 'TEXT_SPLIT'           " Split the text
+     exporting
+          length = 60                " Split at length 60
+          text   = text2             " Text line to split
+     importing
+          line   = #niiibcl          " IDDE Comment
+
+          rest   = text1             " Leftover text (passed col. 60)
+     exceptions
+          others = 1.                " TEXT_SPLIT error
