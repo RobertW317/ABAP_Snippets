@@ -1,0 +1,44 @@
+
+    REPLACE ALL OCCURRENCES OF '-'
+       IN it_tab-field WITH ''.
+
+
+form f_cleantext changing strtext.
+  data: xstring(70),
+        xlen type i,
+        xchr(1),
+        n type i,
+        nn type i,
+        xtabix like sy-tabix.
+
+  xlen = strlen( strtext ).
+  clear: xstring.
+  n = '-1'.
+  nn = '-1'.
+
+  do xlen times.
+    add 1 to n.
+    if n < xlen.
+      xchr =  strtext+n(1).
+
+      if xchr = '"' or
+         xchr = '=' or
+         xchr = '&' or
+         xchr = '<' or
+         xchr = ',' or
+         xchr = '>'.
+        xchr = space.
+      endif.
+
+      if xchr > '&' and " See if it is a single quote
+         xchr < '('.
+        xchr = space.
+      endif.
+
+      add 1 to nn.
+      xstring+nn(1) = xchr.
+    endif.
+  enddo.
+  strtext = xstring.
+
+endform.                    "F_cleantext_lines
