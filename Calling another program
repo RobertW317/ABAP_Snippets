@@ -1,0 +1,30 @@
+
+form xlaunch_IQ03 using serno like itob-SERNR                          
+                        mat like it_out-matnr.  
+            DATA: seltab TYPE TABLE OF rsparams,        
+                  seltab_wa LIKE LINE OF seltab,        
+                  dt TYPE d.
+* MATERIAL  
+seltab_wa-selname = 'MATNR'.  
+seltab_wa-sign    = 'I'.  
+seltab_wa-option  = 'EQ'.  
+seltab_wa-low = mat.  
+APPEND seltab_wa TO seltab.
+
+  SUBMIT SAPMIEQ0         
+         WITH SELECTION-TABLE seltab         
+         VIA SELECTION-SCREEN        
+         AND RETURN.         
+endform.
+
+
+FORM launch_iq03 USING serno LIKE itob-sernr                       
+                       mat LIKE it_out-matnr.  
+  DATA: seltab TYPE TABLE OF rsparams,        
+        seltab_wa LIKE LINE OF seltab,        
+        dt TYPE d.
+        
+  SET PARAMETER ID: 'MAT' FIELD mat,                    'SER' FIELD serno.
+  CALL TRANSACTION 'IQ03' AND SKIP FIRST SCREEN.
+  
+ENDFORM.                    
