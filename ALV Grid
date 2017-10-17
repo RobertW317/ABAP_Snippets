@@ -1,0 +1,625 @@
+
+
+REPORT zm000019 NO STANDARD PAGE HEADING
+                LINE-SIZE 170.
+* Report to retrieve MRP Type, QTY in Stock, Ind. Collective
+*                    Lot size Key, special procurement
+* Addition of bulk materials indicator 04/17/02
+* Addition of List Viewer functionality 04/18/02
+* Addition of material weights 01/06/10
+* Replaced nested select with inner join
+
+
+TABLES: mara,
+        marc,
+        makt,
+        mbew,
+        mvke.
+
+TYPE-POOLS: slis.
+
+SELECTION-SCREEN BEGIN OF BLOCK m_info WITH FRAME TITLE b_line.
+SELECTION-SCREEN SKIP 1.
+SELECT-OPTIONS:
+         xmatnr FOR mara-matnr,  "Material
+         xwerks FOR marc-werks,  "Plant
+         xmtart FOR mara-mtart,  "Material Type
+         xmatkl FOR mara-matkl,  "Material Group
+         xbrgew FOR mara-brgew,  "Gross Weight
+         xntgew FOR mara-ntgew,  "Net Weight
+         xmtpos FOR mvke-mtpos,  "Item Category Group
+         xmtposm FOR mara-mtpos_mara,  "General Item Catergory Group
+         xsernp FOR marc-sernp,  "Serial Number Profile
+         xekgrp FOR marc-ekgrp,  "Purchasing Group         xekgrp FOR marc-ekgrp,  "Purchasing Group
+         xmmsta FOR marc-mmsta,  "Special Mataerial Status
+         xdismm FOR marc-dismm,  "MRP Type
+         xdisls FOR marc-disls,  "Lot Size Key
+         xdisgr FOR marc-disgr,  "MRP Group
+         xdispo FOR marc-dispo,  "MRP Controller
+         xbeskz FOR marc-beskz,  "Procurement Type
+         xsobsl FOR marc-sobsl,  "Special Procurement Type
+         xschgt FOR marc-schgt,  "Bulk Material
+         xsbdkz FOR marc-sbdkz,  "Individual collective
+         xabcin FOR marc-abcin,  "CC Phys. Inventory Indicator
+         xeisbe FOR marc-eisbe,  "Safety Stock
+         xlbkum FOR mbew-lbkum   "Quantity in Stock
+         .
+SELECTION-SCREEN SKIP 1.
+SELECTION-SCREEN END OF BLOCK m_info.
+
+DATA: BEGIN OF imarc OCCURS 0,
+        matnr LIKE mara-matnr,  "Material NUmber
+        maktx LIKE makt-maktx,  "Material Dedscription
+        vkorg LIKE mvke-vkorg,  "Sales Organization
+        vtweg LIKE mvke-vtweg,  "Distribution Channel
+        meins LIKE mara-meins,  "Basic unit of measure
+        ausme LIKE marc-ausme,  "unit of issue
+        bstme LIKE mara-bstme,  "Unit of Order
+        mmsta LIKE marc-mmsta,  "Special Material Status
+        werks LIKE marc-werks,  "Plant
+        mtart LIKE mara-mtart,  "Material Type
+        matkl LIKE mara-matkl,  "Material Group
+        dismm LIKE marc-dismm,  "MRP Type
+        schgt LIKE marc-schgt,  "Bulk
+        sbdkz LIKE marc-sbdkz,  "Individual Collective
+        disls LIKE marc-disls,  "Lot Size Key
+        eisbe LIKE marc-eisbe,  "Safty Stock
+        beskz LIKE marc-beskz,  "Procurement type
+        sobsl LIKE marc-sobsl,  "Special Procurement Type
+        abcin LIKE marc-abcin,  "Phys inv indicator for cycle counting
+        lbkum LIKE mbew-lbkum,  "Qty in Stock
+        dispo LIKE marc-dispo,  "MRP Controler
+        ekgrp LIKE marc-ekgrp,  "Purchasing group
+        sernp LIKE marc-sernp,  "Serial number
+        brgew LIKE mara-brgew,  "Gross Weight
+        gewei LIKE mara-gewei,  "Weight Unit
+        ntgew LIKE mara-ntgew,  "Net Weight
+        mtpos_mara LIKE mara-mtpos_mara, "General Item Category
+        mtpos LIKE mvke-mtpos, "Item Category Group
+        disgr LIKE marc-disgr, "MRP Group
+        bstrf LIKE marc-bstrf, "Rounding Value
+      END OF imarc.
+
+DATA: BEGIN OF xmarc OCCURS 0.
+        INCLUDE STRUCTURE imarc.
+DATA: END OF xmarc.
+
+DATA: g_repid LIKE sy-repid,
+      gs_print            TYPE slis_print_alv,
+      gt_list_top_of_page TYPE slis_t_listheader,
+      gt_events           TYPE slis_t_event,
+      gt_sort             TYPE slis_t_sortinfo_alv,
+      gs_layout           TYPE slis_layout_alv,
+      gt_fieldcat         TYPE slis_t_fieldcat_alv,
+      fieldcat_ln LIKE LINE OF gt_fieldcat,
+      col_pos TYPE i.
+
+data:
+      g_save(1)           type c,
+      g_exit(1)           type c,
+      g_variant           like disvariant,
+      gx_variant          like disvariant.
+
+INITIALIZATION.
+  b_line = 'Search Criteria for Material Information'.
+  g_repid = sy-repid.
+
+**-- Read the default variant
+  PERFORM initialize_variant.
+
+START-OF-SELECTION.
+  SELECT mara~matnr makt~maktx mvke~vkorg mvke~vtweg
+         mara~meins marc~ausme mara~bstme marc~mmsta
+         marc~werks mara~mtart mara~matkl marc~dismm
+         marc~schgt marc~sbdkz marc~disls marc~eisbe
+         marc~beskz marc~sobsl marc~abcin mbew~lbkum
+         marc~dispo marc~ekgrp marc~sernp mara~brgew
+         mara~gewei mara~ntgew mara~mtpos_mara
+         mvke~mtpos marc~disgr marc~bstrf
+    INTO TABLE xmarc
+    FROM ( ( ( ( mara INNER JOIN makt ON mara~matnr = makt~matnr )
+            LEFT OUTER JOIN mvke ON mara~matnr = mvke~matnr )
+            INNER JOIN marc ON mara~matnr = marc~matnr )
+            INNER JOIN mbew ON mara~matnr = mbew~matnr
+                          AND  marc~werks = mbew~bwkey )
+
+    WHERE mara~matnr IN xmatnr
+      AND mara~matnr IN xmatnr
+      AND marc~werks IN xwerks
+      AND mara~mtart IN xmtart
+      AND marc~mmsta IN xmmsta
+      AND marc~schgt IN xschgt
+      AND mara~matkl IN xmatkl
+      AND marc~dismm IN xdismm
+      AND marc~dispo IN xdispo
+      AND marc~sbdkz IN xsbdkz
+      AND marc~disls IN xdisls
+      AND marc~ekgrp IN xekgrp
+      AND marc~beskz IN xbeskz
+      AND marc~sobsl IN xsobsl
+      AND mbew~lbkum IN xlbkum
+      AND marc~eisbe IN xeisbe
+      AND marc~abcin IN xabcin
+      AND marc~sernp IN xsernp
+      AND mara~brgew IN xbrgew
+      AND mara~ntgew IN xntgew
+*      AND mvke~mtpos IN xmtpos
+      AND mara~mtpos_mara IN xmtposm
+      AND marc~disgr IN xdisgr.
+
+  LOOP AT xmarc WHERE vtweg NE 0.
+    IF xmarc-werks(1) NE xmarc-vtweg(1).
+      xmarc-werks = '9999'.
+      MODIFY xmarc.
+    ENDIF.
+  ENDLOOP.
+
+  DELETE xmarc WHERE werks = '9999'.
+
+  PERFORM build_field_cat.
+  PERFORM eventtab_build CHANGING gt_events.
+*  perform comment_build  changing gt_list_top_of_page.
+  PERFORM call_alv.
+
+*---------------------------------------------------------------------*
+*       FORM build_field_cat                                          *
+*---------------------------------------------------------------------*
+*       ........                                                      *
+*---------------------------------------------------------------------*
+FORM build_field_cat.
+  DATA: fieldcat_in TYPE slis_fieldcat_alv.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'MATNR'.  "Material
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'MATNR'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARA'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Material'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'MAKTX'.  "Material Description
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'MAKTX'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MAKT'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Description'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'MTART'.  "MTyp
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'MTART'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARA'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Mat. Type'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'MATKL'.  "Mat. Grp.
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'MATKL'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARA'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Mat. Grp.'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'WERKS'.  "Plnt
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'WERKS'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Plant'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'VKORG'.  "Sorg.
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'VKORG'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MVKE'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Sales Org'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'VTWEG'.  "DChl
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'VTWEG'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MVKE'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Distribution Chan.'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'MEINS'.  "UoM
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'MEINS'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARA'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'UoM'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'AUSME'.  "Uol
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'AUSME'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'UoI'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'BSTME'.  "Uo0
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'BSTME'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARA'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'UoO'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'BRGEW'.  "Gross Weight
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'BRGEW'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARA'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Gross Weight'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'GEWEI'.  "WUn
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'GEWEI'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARA'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Weight Unit'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'NTGEW'.  "Net Weight
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'NTGEW'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARA'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Net Weight'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'MTPOS_MARA'.  "ItCGr
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'MTPOS_MARA'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARA'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Gen Item Cat'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'MTPOS'.  "Item Cat Grp
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'MTPOS'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARA'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Item Cat Grp'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'SERNP'.  "Profl.
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'SERNP'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'SerNoProf'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'EKGRP'.  "PGr
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'EKGRP'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Prch. Grp.'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'MMSTA'.  "MS
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'MMSTA'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Sp. Status'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'DISMM'.  "Typ
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'DISMM'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'MRP Type'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'DISLS'.  "LS
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'DISLS'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Lot Size Key'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'DISGR'.  "MRP
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'DISGR'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'MRP Grp'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'DISPO'.  "MRPC
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'DISPO'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'MRP Crntrl.'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'BSTRF'.  "Rounding Value
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'BSTRF'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Rounding Value'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'BESKZ'.  "ProcType
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'BESKZ'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Proc. Type'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'SOBSL'.  "SPT
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'SOBSL'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Spc. Proc.'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'SCHGT'.  "Bulk
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'SCHGT'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Bulk'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'SBDKZ'.  "I/C
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'SBDKZ'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Ind. Coll.'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'ABCIN'.  "CC
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'ABCIN'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'Invt. Indi.'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'EISBE'.  "Safety Stock
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'EISBE'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MARC'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'SFT Stock'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+  CLEAR fieldcat_in.
+  fieldcat_ln-fieldname = 'LBKUM'.  "Total Stock
+  fieldcat_ln-tabname   = 'XMARC'.
+  fieldcat_ln-ref_fieldname = 'LBKUM'. "<- REF FIELD IN THE DICTIONNARY
+  fieldcat_ln-ref_tabname   = 'MBEW'.  "<- REF TABLE IN THE DICTIONNARY
+  fieldcat_ln-no_out    = ' '.  "FIELD NOT DISPLAY, CHOOSE FROM LAYOUT
+  fieldcat_ln-key       = ' '.   "SUBTOTAL KEY
+  fieldcat_ln-no_out    = ' '.
+  fieldcat_ln-seltext_l = 'QTY Stock'.
+  APPEND fieldcat_ln TO gt_fieldcat.
+
+
+* DATA SORTING AND SUBTOTAL
+  DATA: gs_sort TYPE slis_sortinfo_alv.
+
+  CLEAR gs_sort.
+  gs_sort-fieldname = 'MATNR'.
+  gs_sort-spos      = 1.
+  gs_sort-up        = 'X'.
+*  gs_sort-subtot    = ' '.
+  APPEND gs_sort TO gt_sort.
+
+  DATA: gt_layout TYPE slis_layout_alv.
+  CLEAR: gt_layout.
+  gs_layout-zebra = 'X'.
+
+ENDFORM.                    "build_field_cat
+
+*---------------------------------------------------------------------*
+*       FORM call_alv                                                 *
+*---------------------------------------------------------------------*
+*       ........                                                      *
+*---------------------------------------------------------------------*
+FORM call_alv.
+
+  CALL FUNCTION 'REUSE_ALV_LIST_DISPLAY'
+  EXPORTING
+* I_INTERFACE_CHECK = ' '
+* I_BYPASSING_BUFFER =
+* I_BUFFER_ACTIVE = ' '
+  i_callback_program = g_repid
+* I_CALLBACK_PF_STATUS_SET = ' '
+* I_CALLBACK_USER_COMMAND = ' '
+  i_structure_name = 'XMARC'
+  is_layout =  gs_layout
+  it_fieldcat = gt_fieldcat[]
+* IT_EXCLUDING =
+* IT_SPECIAL_GROUPS =
+    it_sort = gt_sort[]
+* IT_FILTER =
+* IS_SEL_HIDE =
+ i_default = 'X'
+ i_save = 'A'
+ is_variant = gx_variant
+    it_events = gt_events[]
+* IT_EVENT_EXIT =
+    is_print = gs_print
+* IS_REPREP_ID =
+* I_SCREEN_START_COLUMN = 0
+* I_SCREEN_START_LINE = 0
+* I_SCREEN_END_COLUMN = 0
+* I_SCREEN_END_LINE = 0
+* IMPORTING
+* E_EXIT_CAUSED_BY_CALLER =
+* ES_EXIT_CAUSED_BY_USER =
+  TABLES
+  t_outtab = xmarc
+  EXCEPTIONS
+  program_error = 1
+  OTHERS = 2.
+
+ENDFORM.                    "call_alv
+
+*---------------------------------------------------------------------*
+*       FORM eventtab_build                                           *
+*---------------------------------------------------------------------*
+*       ........                                                      *
+*---------------------------------------------------------------------*
+*  -->  lt_events                                                     *
+*---------------------------------------------------------------------*
+FORM eventtab_build CHANGING lt_events TYPE slis_t_event.
+  CONSTANTS:
+  gc_formname_top_of_page TYPE slis_formname VALUE 'TOP_OF_PAGE'.
+*GC_FORMNAME_END_OF_PAGE TYPE SLIS_FORMNAME VALUE 'END_OF_PAGE'.
+
+  DATA: ls_event TYPE slis_alv_event.
+
+  CALL FUNCTION 'REUSE_ALV_EVENTS_GET'
+    EXPORTING
+      i_list_type = 0
+    IMPORTING
+      et_events   = lt_events.
+
+  READ TABLE lt_events WITH KEY name =  slis_ev_top_of_page
+                           INTO ls_event.
+  IF sy-subrc = 0.
+    MOVE gc_formname_top_of_page TO ls_event-form.
+    APPEND ls_event TO lt_events.
+  ENDIF.
+
+* define END_OF_PAGE event
+* READ TABLE LT_EVENTS WITH KEY NAME =  SLIS_EV_END_OF_PAGE
+*                          INTO LS_EVENT.
+* IF SY-SUBRC = 0.
+*   MOVE GC_FORMNAME_END_OF_PAGE TO LS_EVENT-FORM.
+*   APPEND LS_EVENT TO LT_EVENTS.
+* ENDIF.
+ENDFORM.                    "eventtab_build
+
+*&---------------------------------------------------------------------*
+*&      Form  initialize_variant
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM initialize_variant .
+  g_save = 'A'.
+  CLEAR g_variant.
+  g_variant-report = g_repid.
+  gx_variant = g_variant.
+  CALL FUNCTION 'REUSE_ALV_VARIANT_DEFAULT_GET'
+    EXPORTING
+      i_save     = g_save
+    CHANGING
+      cs_variant = gx_variant
+    EXCEPTIONS
+      not_found  = 2.
+  IF sy-subrc = 0.
+*    p_vari = gx_variant-variant.
+  ENDIF.
+
+ENDFORM.                    " initialize_variant
