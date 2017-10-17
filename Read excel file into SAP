@@ -1,0 +1,177 @@
+
+FORM load_legacy_notes.
+
+* Excel File saved as c:\temp\data_aging_legacy.xls
+* File format: header row, data starts on row 2
+* column 1:  AR or AP indicator
+* column 2:  Company Code
+* column 3:  Billing document number
+* column 4:  Date in sap format ie: 20100101 or jan 1, 2010
+* column 5:  User name
+* MAX Limit on char/cell in Excel, split into 5 columns
+* column 6:  Note - first 50 characters
+* column 7:  Note - second 50 characters
+* column 8:  Note - third 50 characters
+* column 9:  Note - forth 50 characters
+* column 10: Note - fifth 50 characters
+
+* excel to convert to sap date :
+* =YEAR(G2)&IF(LEN(MONTH(G2))=1,"0"&MONTH(G2),MONTH(G2))&
+* IF(LEN(DAY(G2))=1,"0"&DAY(G2),DAY(G2))
+
+  DATA: chk(1) TYPE c,
+        tm_stamp LIKE zagingt_notes-ertime,
+        fileopen LIKE rlgrap-filename.
+
+  DATA: itab1 LIKE alsmex_tabline OCCURS 0 WITH HEADER LINE.
+
+  DATA: b1 TYPE i VALUE 1,       "starting column
+        c1 TYPE i VALUE 2,       "starting row
+        b2 TYPE i VALUE 10,       "ending  column
+        c2 TYPE i.               "ending row
+
+  DATA: aging_notes TYPE zagingt_notes,
+        aging_notes_tab TYPE HASHED TABLE
+                 OF zagingt_notes
+                 WITH UNIQUE KEY bukrs
+                                 belnr
+                                 erdat
+                                 ertime.
+
+  CONCATENATE 'C:\temp\'
+              'data_aging_legacy.xls'
+              INTO fileopen.
+
+  c2 = row_ct + 1.  "insure last row is loaded
+
+  CALL FUNCTION 'ALSM_EXCEL_TO_INTERNAL_TABLE'
+    EXPORTING
+      filename                = fileopen
+      i_begin_col             = b1
+      i_begin_row             = c1
+      i_end_col               = b2
+      i_end_row               = c2
+    TABLES
+      intern                  = itab1
+    EXCEPTIONS
+      inconsistent_parameters = 1
+      upload_ole              = 2
+      OTHERS                  = 3.
+
+  IF sy-subrc <> 0.
+    WRITE: / 'Error reading excel file'.
+  ELSE.
+
+  chk = space.
+  tm_stamp = sy-uzeit.
+
+    LOOP AT itab1.              " Fill table from Excel data
+
+      CASE itab1-col.
+
+        WHEN '0001'.                    "AR or AP indicator
+          IF chk = 'X'.
+            INSERT aging_notes INTO TABLE aging_notes_tab.
+            CLEAR aging_notes.
+          ENDIF.
+          chk = 'X'.
+          clear aging_notes.
+          tm_stamp = tm_stamp + 1.
+          aging_notes-ertime = tm_stamp.
+          aging_notes-client = '100'.
+          aging_notes-aging_type = itab1-value.
+        WHEN '0002'.                    "Company Code
+          aging_notes-bukrs = itab1-value.
+        WHEN '0003'.                    "Billing document number
+          CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+            EXPORTING
+              input  = itab1-value
+            IMPORTING
+              output = aging_notes-belnr.
+        WHEN '0004'.                    "Created on
+          aging_notes-erdat = itab1-value.
+        WHEN '0005'.                    "User name
+          aging_notes-ernam = itab1-value.
+
+        WHEN '0006'.                   "Note - first 50
+          aging_notes-note = itab1-value.
+        WHEN '0007'.                   "Note - second 50
+          concatenate aging_notes-note itab1-value
+                      into aging_notes-note.
+        WHEN '0008'.                   "Note - third 50
+          concatenate aging_notes-note itab1-value
+                      into aging_notes-note.
+        WHEN '0009'.                   "Note - forth 50
+          concatenate aging_notes-note itab1-value
+                      into aging_notes-note.
+        WHEN '0010'.                   "Note - fifth 50
+          concatenate aging_notes-note itab1-value
+                      into aging_notes-note.
+      ENDCASE.
+    ENDLOOP.
+
+    INSERT aging_notes INTO TABLE aging_notes_tab.
+
+    TRY.
+
+        INSERT zagingt_notes FROM TABLE aging_notes_tab.
+        IF sy-subrc <> 0.
+          MESSAGE 'estimate table not updated'
+                            TYPE 'I'
+                            DISPLAY LIKE 'E'.
+        ENDIF.
+
+      CATCH cx_root.
+        MESSAGE 'estimate table not updated'
+                             TYPE 'I'
+                             DISPLAY LIKE 'E'.
+    ENDTRY.
+
+  ENDIF.
+
+ENDFORM.                    "load_legacy_notes
+
+
+
+
+form processwipfile.       "open excel file, fill table
+  data: strt(50) type c.
+  data: wbs like prps-posid.
+  data: itab1 like alsmex_tabline occurs 0 with header line.
+  data: b1 type i value 1,
+        c1 type i value 7,
+        b2 type i value 6,
+        c2 type i value 60000.
+
+  call function 'ALSM_EXCEL_TO_INTERNAL_TABLE'
+    exporting
+      filename                = fileopen
+      i_begin_col             = b1
+      i_begin_row             = c1
+      i_end_col               = b2
+      i_end_row               = c2
+    tables
+      intern                  = itab1
+    exceptions
+      inconsistent_parameters = 1
+      upload_ole              = 2
+      others                  = 3.
+
+  loop at itab1.                      " Fill table from Excel data
+    case itab1-col.
+      when '0003'.    "Text
+        it_gldata-wbstext = itab1-value.    " text
+        strt = itab1-value.
+        shift strt left by 4 places.
+        wbs = strt.
+        it_gldata-posid = wbs.              " converted txt to wbs
+      when '0004'.                      " amount
+        if itab1-value <> '0'.
+          it_gldata-amount = itab1-value.
+          append it_gldata.
+        endif.
+        clear it_gldata.
+    endcase.
+  endloop.
+  sort it_gldata ascending by posid.
+endform.                    "ProcessWipFile
