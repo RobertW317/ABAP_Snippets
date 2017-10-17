@@ -1,31 +1,4 @@
 
-
-SPAN {
-font-family: "Courier New";
-font-size: 10pt;
-color: #000000;
-background: #FFFFFF;
-}
-.L0S31 {
-font-style: italic;
-color: #808080;
-}
-.L0S32 {
-color: #3399FF;
-}
-.L0S33 {
-color: #4DA619;
-}
-.L0S52 {
-color: #0000FF;
-}
-.L0S55 {
-color: #800080;
-}
-.L0S70 {
-color: #808080;
-}
-
 DATA: BEGIN OF PAGE,
         SCRLLINE LIKE SYST-LILLI,      "scroll line to top of screen
         CURSLINE LIKE SYST-LILLI,      "line to put cursor on
