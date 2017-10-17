@@ -1,0 +1,30 @@
+
+
+
+REPLACE ',' WITH '' INTO itab1-value.
+       CONDENSE itab1-value NO-GAPS.
+        PERFORM check_if_numeric USING itab1-value
+                              CHANGING chk_number.
+        IF chk_number = 'X'.
+          EXIT.
+        ENDIF.
+
+
+form check_if_numeric using chk_value type c
+                   changing result type c.
+
+   DATA: chk_number type p decimals 2,
+         mssg(120) type c.
+
+   result = space.
+   try.
+     chk_number = chk_value.
+     catch cx_root.
+       concatenate 'Non numeric value found in excel file'
+                   'in columns D, F, or H'
+                   'Correct excel file and retry' into mssg
+                   separated by space.
+       result = 'X'.
+       MESSAGE mssg TYPE 'I'.   "E'.
+   endtry.
+ endform.
