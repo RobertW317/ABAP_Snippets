@@ -1,0 +1,22 @@
+
+
+  Deleting leading zeros 
+ 
+  shift <field> left deleting leading '0'.                                    
+  
+  Placing leading zero
+ 
+  You can use the function module
+  'CONVERSION_EXIT_ALPHA_INPUT' and pass the fiel
+  (or even part of the field) to be padded
+  with zeroes.                          
+ 
+  Or else, you can use WRITE field USING
+  EDIT MASK '==ALPHA'.                    
+ 
+  There is also a function module
+  (conversion exit) '                            
+ 
+  'CONVERSION_EXIT_ALPHA_OUTPUT' to do just the reverse.
+ 
+
