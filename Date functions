@@ -1,31 +1,4 @@
 
-
-SPAN {
-font-family: "Courier New";
-font-size: 10pt;
-color: #000000;
-background: #FFFFFF;
-}
-.L0S31 {
-font-style: italic;
-color: #808080;
-}
-.L0S32 {
-color: #3399FF;
-}
-.L0S33 {
-color: #4DA619;
-}
-.L0S52 {
-color: #0000FF;
-}
-.L0S55 {
-color: #800080;
-}
-.L0S70 {
-color: #808080;
-}
-
 form dt_to_wk using dt changing xstr.
    data: F_dt LIKE SCAL-DATE,
          F_wk LIKE SCAL-WEEK.
@@ -86,3 +59,14 @@ FORM f_converttolocaldt USING dt TYPE d
   dtout = xstr.
 
 ENDFORM.                    "F_converttolocaldt
+
+form f_converttolocaldt using dt changing dtout.  data: xstr(20) type c.
+  call function 'CONVERT_DATE_TO_EXTERNAL'   exporting     date_internal                  = dt   importing     date_external                  = xstr*   EXCEPTIONS*     DATE_INTERNAL_IS_INVALID       = 1*     OTHERS                         = 2            .  if sy-subrc <> 0.* MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO*         WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.  endif.
+  dtout = xstr.
+endform.                    "F_converttolocaldt
+  call function 'DATE_TO_PERIOD_CONVERT'       exporting            i_date         = sy-datum*         I_MONMIT       = 00            i_periv        = 'K4'       importing            e_buper        = x_per            e_gjahr        = x_yr       exceptions            input_false    = 1            t009_notfound  = 2            t009b_notfound = 3            others         = 4.
+*&---------------------------------------------------------------------**&      Form  CALCULATE_DATE*&---------------------------------------------------------------------**       Add/Subtract n number of months from a date*----------------------------------------------------------------------**  -->  p_months  Number of months to add/subtract*  <--  p_date    Start date and result date*----------------------------------------------------------------------*
+FORM calculate_date USING p_months                    CHANGING p_date.
+  DATA: ld_datestor TYPE sy-datum.
+  ld_datestor = p_date.
+  CALL FUNCTION 'MONTH_PLUS_DETERMINE'    EXPORTING      MONTHS        = p_months      OLDDATE       = p_date    IMPORTING      NEWDATE       = p_date.ENDFORM.                    " CALCULATE_DATE
